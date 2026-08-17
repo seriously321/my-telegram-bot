@@ -1,0 +1,117 @@
+import asyncio
+import random
+from aiogram import Bot, Dispatcher, F, html
+from aiogram.filters import CommandStart
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+
+TOKEN = "8381008943:AAE6c-ql8qpdl71lAi4npdCsrDzNk_0Qih0"
+
+# Состояния для калькулятора
+class CalculatorState(StatesGroup):
+    waiting_for_expression = State()
+
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+dp = Dispatcher(storage=MemoryStorage())
+
+def get_main_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 Случайные фразы", callback_data="get_phrase")],
+        [InlineKeyboardButton(text="🧮 Калькулятор", callback_data="calc_mode")],
+        [InlineKeyboardButton(text="ℹ️ Для чего этот бот?", callback_data="about_bot")],
+        [InlineKeyboardButton(text="💬 Контакты и Связь", callback_data="contact_me")]
+    ])
+
+def get_phrase_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 Случайная фраза", callback_data="get_phrase")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_menu")]
+    ])
+
+def get_back_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_menu")]
+    ])
+
+@dp.message(CommandStart())
+async def command_start_handler(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    name = html.quote(message.from_user.first_name)
+    text = (
+        f"Привет, {name}! 👋\n\n"
+        "Добро пожаловать в меню бота. Выбери действие ниже:"
+    )
+    await message.answer(text, reply_markup=get_main_menu())
+
+# Обработчик случайных фраз с новой клавиатурой под сообщением
+@dp.callback_query(F.data == "get_phrase")
+async def send_random_phrase(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    phrases = [
+        "«Код работает — лучше не трогай.»",
+        "«Сначала заставь это работать, потом сделай красиво.»",
+        "«Python — это просто, когда всё работает с первой попытки.»",
+        "«Чашечка кофе и можно фиксить баги дальше.»"
+    ]
+    text = f"💬 **Случайная фраза:**\n\n{random.choice(phrases)}"
+    await callback.message.edit_text(text, reply_markup=get_phrase_keyboard())
+    await callback.answer()
+
+# Включение режима калькулятора
+@dp.callback_query(F.data == "calc_mode")
+async def start_calc(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(CalculatorState.waiting_for_expression)
+    await callback.message.edit_text(
+        "🧮 **Режим калькулятора включен!**\n\n"
+        "Отправь мне математический пример в чат (например: 2+2*2 или `100/5`), и я посчитаю.\n\n"
+        "Для выхода нажми кнопку ниже:",
+        reply_markup=get_back_keyboard()
+    )
+    await callback.answer()
+
+# Обработка введенного примера
+@dp.message(CalculatorState.waiting_for_expression)
+async def process_calc(message: Message, state: FSMContext) -> None:
+    expression = message.text
+    try:
+        result = eval(expression, {"__builtins__": None}, {})
+        await message.answer(f"Результат: **{result}**\n\nМожешь отправить следующий пример или выйти через меню.")
+    except Exception:
+        await message.answer("⚠️ Ошибка в выражении. Пожалуйста, используй только цифры и знаки операций (+, -, *, /).")
+
+# Описание бота
+@dp.callback_query(F.data == "about_bot")
+async def process_about(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.message.edit_text(
+        "ℹ️ **Для чего этот бот?**\n\n"
+        "Этот интерактивный бот создан для демонстрации возможностей программирования на Python и aiogram. "
+        "Здесь собраны удобные мини-инструменты: генератор случайных фраз, встроенный калькулятор и быстрый доступ к контактам.",reply_markup=get_back_keyboard()
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "contact_me")
+async def process_contacts(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.message.edit_text(
+        "💬 **Контакты и Связь**\n\nСвязь со мной: @saww_w",
+        reply_markup=get_back_keyboard()
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "back_to_menu")
+async def process_back(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    name = html.quote(callback.from_user.first_name)
+    text = f"Главное меню, {name}. Выбери пункт:"
+    await callback.message.edit_text(text, reply_markup=get_main_menu())
+    await callback.answer()
+
+async def main() -> None:
+    await dp.start_polling(bot)
+
+await main()
