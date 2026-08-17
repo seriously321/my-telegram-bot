@@ -1,4 +1,37 @@
 import asyncio
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+from aiogram import Bot, Dispatcher, types
+
+# Заглушка веб-сервера для Render (чтобы Web Service не зависал)
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"I am alive!")
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', 10000), SimpleHandler)
+    server.serve_forever()
+
+# Запускаем веб-сервер в отдельном потоке
+threading.Thread(target=run_server, daemon=True).start()
+
+# Твой основной код бота (вставь свой токен)
+TOKEN = "8381008943:AAE6c-ql8qpdl71lAi4npdCsrDzNk_0Qih0"
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
+@dp.message()
+async def echo(message: types.Message):
+    await message.answer("Привет! Я живой.")
+
+async def main():
+    await dp.start_polling(bot)
+
+if name == "__main__":
+    asyncio.run(main())
+import asyncio
 import random
 from aiogram import Bot, Dispatcher, F, html
 from aiogram.filters import CommandStart
